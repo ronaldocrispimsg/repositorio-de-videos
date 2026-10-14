@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-STREAM_PATH = Path(os.getenv("STREAM_PATH", "/streams_ready"))
+STREAM_PATH = Path(os.getenv("STREAM_PATH", "/processed_videos"))
 STREAM_PATH.mkdir(parents=True, exist_ok=True)
 
 STREAM_BASE_URL = os.getenv("STREAM_BASE_URL", "http://localhost:8001/streams").rstrip("/")

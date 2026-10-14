@@ -1,9 +1,30 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-secret
+type: Opaque
+stringData:
+  # String de conexão AMQP do RabbitMQ no cluster ou IP externo
+  # Exemplo interno K3s: amqp://videobox:123456@rabbitmq.default.svc.cluster.local:5672/
+  host: "amqp://videobox:123456@rabbitmq.default.svc.cluster.local:5672/"
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-trigger-auth
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: rabbitmq-secret
+      key: host
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: videobox-process
 spec:
-  replicas: 1
+  # O KEDA gerencia a contagem de réplicas automaticamente
+  replicas: 0
   selector:
     matchLabels:
       app: videobox-process
@@ -16,15 +37,27 @@ spec:
         role: processor
       containers:
         - name: process
-          image: registry.example.com/videobox/process:latest
-          imagePullPolicy: Always
+          image: videobox-process:latest
+          imagePullPolicy: IfNotPresent
           env:
             - name: RABBIT_URL
-              value: amqp://videobox:123456@rabbit.internal/
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: host
             - name: EXPORT_PATH
               value: /srv/videobox/export
             - name: CLEAN_TMP
               value: "true"
+            - name: REPO_STREAM_URL
+              value: http://repository.default.svc.cluster.local:8001
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
           volumeMounts:
             - mountPath: /srv/videobox/export
               name: export
@@ -32,3 +65,26 @@ spec:
         - name: export
           persistentVolumeClaim:
             claimName: videobox-export-pvc
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: videobox-process-scaledobject
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: videobox-process
+  minReplicaCount: 0          # Escala a 0 (desliga pods) quando não há vídeos para processar
+  maxReplicaCount: 10         # Limite máximo de réplicas simultâneas de FFMPEG
+  cooldownPeriod: 60          # Tempo (segundos) aguardando antes de reduzir pods após a fila esvaziar
+  pollingInterval: 15         # Frequência (segundos) em que o KEDA consulta a fila no RabbitMQ
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: video.uploaded # Fila escutada pelo worker no FastStream
+        mode: QueueLength
+        value: "1"                # 1 vídeo por pod (como FFMPEG usa muita CPU, 1 por pod garante velocidade máxima)
+      authenticationRef:
+        name: rabbitmq-trigger-auth

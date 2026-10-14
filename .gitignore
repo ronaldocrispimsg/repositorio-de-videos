@@ -1,33 +1,46 @@
-connect/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
 
+# Ambientes Virtuais
 venv/
-node_modules/
-**/__pycache__/**
+.venv/
+env/
+ENV/
 
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Armazenamento e Processamento de Vídeos (Local)
+videos_raw/
+streams_ready/
+videos_state.json
+videos_state.json.tmp
+export/
+hls/
 
-/coverage
+# Arquivos de mídia (evita commit acidental de arquivos pesados)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.ts
+*.m3u8
 
-.next/
-/out/
+# Logs e Temporários
+*.log
+*.tmp
+tmp/
+.tmp/
 
-/build
-
+# IDEs e Sistema Operacional
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
 *.pem
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-.vercel
-
-*.tsbuildinfo
-next-env.d.ts
+connect/
