@@ -170,32 +170,3 @@ docker-compose up --build
    * Envie um vídeo
    * Aguarde o processamento
    * Consuma o vídeo via streaming HLS
-
----
-
-## 👥 Equipe
-
-
-* **[Ronaldo Crispim](https://github.com/ronaldocrispimsg/)** 
-  Backend, RepoStream, RabbitMQ
-
-* **[Marcio Martins](https://github.com/mferrreira)**
-  Frontend, Process, K3s, Docker
-
-* **[Vinicius Rodrigues](https://github.com/vinirodriguesz)**
-  NGINX
-  
----
-
-## 📜 Licença
-
-Este projeto utiliza a licença **MIT**.
-Uso acadêmico e educacional.
-
----
-
-## 🙏 Agradecimentos
-
-Agradecemos ao **Prof. Adriano Antunes** pela excelente condução da disciplina e pelos conhecimentos transmitidos, e ao **IFNMG – Campus Januária** pela oportunidade de desenvolvimento do projeto.
- 
----

@@ -3,17 +3,29 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import FastAPI, UploadFile, Form, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
-STREAM_PATH = Path(os.getenv("STREAM_PATH", "/var/www/html/streams"))
+STREAM_PATH = Path(os.getenv("STREAM_PATH", "/streams_ready"))
 STREAM_PATH.mkdir(parents=True, exist_ok=True)
 
-STREAM_BASE_URL = os.getenv("STREAM_BASE_URL", "http://STREAM_REPO_IP/streams").rstrip("/")
+STREAM_BASE_URL = os.getenv("STREAM_BASE_URL", "http://localhost:8001/streams").rstrip("/")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/streams", StaticFiles(directory=str(STREAM_PATH)), name="streams")
 
 
 class CompletePayload(BaseModel):
