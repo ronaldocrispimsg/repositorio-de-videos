@@ -1,0 +1,11 @@
+#instalar nginx
+sudo apt update
+sudo apt install nginx -y
+
+#criar as pastas do video
+sudo mkdir -p /var/www/html/streams
+sudo chown -R ubuntu:ubuntu /var/www/html/streams
+
+#configurar
+/var/www/html/streams/<video_id>/playlist.m3u8
+

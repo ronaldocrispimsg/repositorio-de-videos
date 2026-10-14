@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: videobox-gateway
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: videobox-gateway
+  template:
+    metadata:
+      labels:
+        app: videobox-gateway
+    spec:
+      nodeSelector:
+        role: gateway
+      containers:
+        - name: gateway
+          image: registry.example.com/videobox/gateway:latest
+          imagePullPolicy: Always
+          env:
+            - name: FRONTEND_UPSTREAM
+              value: http://frontend.internal:3000
+            - name: BACKEND_UPSTREAM
+              value: http://backend.internal:8000
+            - name: RABBIT_UPSTREAM
+              value: http://rabbit.internal:15672
+            - name: CLIENT_MAX_BODY_SIZE
+              value: 2G
+          ports:
+            - containerPort: 80
+              hostPort: 80
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10

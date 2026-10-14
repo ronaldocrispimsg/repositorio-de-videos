@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: videobox-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: videobox
+      RABBITMQ_DEFAULT_PASS: 123456
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: videobox-backend
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBIT_URL: amqp://videobox:123456@rabbitmq:5672/
+      VIDEO_STORAGE: /videos_raw
+      VIDEO_STATE_FILE: /videos_raw/videos_state.json
+      FILE_BASE_URL: http://backend:8000
+    volumes:
+      - backend_videos:/videos_raw
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: videobox-frontend
+    # environment:
+    #   NEXT_PUBLIC_API_BASE: http://gateway/api
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+  process:
+    build:
+      context: ./process
+    container_name: videobox-process
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBIT_URL: amqp://videobox:123456@rabbitmq:5672/
+      EXPORT_PATH: /srv/videobox/export
+      CLEAN_TMP: "true"
+      TMP_HLS: /tmp/hls
+      REPO_STREAM_URL: http://repo_stream:8001
+    volumes:
+      - process_export:/srv/videobox/export
+
+  repo_stream:
+    build:
+      context: ./repo_stream
+    container_name: videobox-stream-worker
+    depends_on:
+      - rabbitmq
+      - process
+    environment:
+      STREAM_PATH: /streams_ready
+      STREAM_BASE_URL: http://localhost:8082/streams
+    volumes:
+      - streams_ready:/streams_ready
+    ports:
+      - "8001:8001"
+
+  stream_server:
+    image: nginx:1.25-alpine
+    container_name: videobox-stream-server
+    depends_on:
+      - repo_stream
+    volumes:
+      - streams_ready:/usr/share/nginx/html/streams:ro
+    ports:
+      - "8082:80"
+    command: ["/bin/sh", "-c", "mkdir -p /usr/share/nginx/html/streams && exec nginx -g 'daemon off;'"]
+
+  gateway:
+    build:
+      context: ./nginx
+    container_name: videobox-gateway
+    depends_on:
+      - frontend
+      - backend
+      - rabbitmq
+    environment:
+      FRONTEND_UPSTREAM: http://frontend:3000
+      BACKEND_UPSTREAM: http://backend:8000
+      RABBIT_UPSTREAM: http://rabbitmq:15672
+      CLIENT_MAX_BODY_SIZE: 2G
+    ports:
+      - "80:80"
+
+volumes:
+  backend_videos:
+  process_export:
+  streams_ready:

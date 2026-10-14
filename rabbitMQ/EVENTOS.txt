@@ -1,0 +1,53 @@
+EVENTOS
+
+1. `video.uploaded`
+   - Origem: backend
+   - Quem consome: process
+   - Payload:
+     ```
+     {
+       "video_id": "...",
+       "path": "/home/admin/videos_raw/<video_id>"
+     }
+     ```
+   - Disparado assim que o frontend envia um vídeo para o backend.
+
+2. `video.processing`
+   - Origem: process
+   - Quem consome: backend (opcional) + monitoramento
+   - Payload mínimo: `{ "video_id": "...", "status": "processing" }`
+   - Serve apenas para sinalizar que a conversão começou.
+
+3. `video.converted`
+   - Origem: process
+   - Quem consome: stream_repo
+   - Payload:
+     ```
+     {
+       "video_id": "...",
+       "status": "converted",
+       "export_path": "/srv/videobox/export/<video_id>",
+       "relative_path": "<video_id>",
+       "playlist_name": "playlist.m3u8",
+       "segments": ["000.ts", ...]
+     }
+     ```
+   - Enviado quando o FFMPEG termina. O diretório `export_path` está em um storage
+     compartilhado (EFS/NFS) para o repo_stream copiar.
+
+4. `video.ready`
+   - Origem: stream_repo
+   - Quem consome: backend + frontend
+   - Payload:
+     ```
+     {
+       "video_id": "...",
+       "status": "ready",
+       "stream_url": "http://IP_STREAM/streams/<video_id>/playlist.m3u8"
+     }
+     ```
+   - Emitido depois que o repositório de stream copia o diretório exportado e publica a URL final.
+
+Extensões futuras:
+   - `video.segment.ready`: process → stream_repo para enviar cada fragmento assim que estiver pronto
+     (útil se quisermos liberar trechos antes da conversão completa).

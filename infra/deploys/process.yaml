@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videobox-process
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: videobox-process
+  template:
+    metadata:
+      labels:
+        app: videobox-process
+    spec:
+      nodeSelector:
+        role: processor
+      containers:
+        - name: process
+          image: registry.example.com/videobox/process:latest
+          imagePullPolicy: Always
+          env:
+            - name: RABBIT_URL
+              value: amqp://videobox:123456@rabbit.internal/
+            - name: EXPORT_PATH
+              value: /srv/videobox/export
+            - name: CLEAN_TMP
+              value: "true"
+          volumeMounts:
+            - mountPath: /srv/videobox/export
+              name: export
+      volumes:
+        - name: export
+          persistentVolumeClaim:
+            claimName: videobox-export-pvc
