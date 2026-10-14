@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repositório de Vídeos</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- hls.js permite tocar transmissões .m3u8 no player -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Repositório de Vídeos</h1>
+    </header>
+
+    <!-- Upload -->
+    <section class="card">
+      <h2>Enviar Novo Vídeo</h2>
+      <form id="uploadForm">
+        <input type="file" id="videoFileInput" accept="video/*" required>
+        <button type="submit" id="uploadBtn">Enviar</button>
+      </form>
+      <div id="uploadStatus" class="status-msg"></div>
+    </section>
+
+    <!-- Player -->
+    <section class="card">
+      <h2>Player de Vídeo</h2>
+      <p id="playerCurrent">Selecione um vídeo pronto na lista abaixo para reproduzir.</p>
+      <div class="video-wrapper">
+        <video id="videoPlayer" controls playsinline></video>
+      </div>
+    </section>
+
+    <!-- Lista de Vídeos -->
+    <section class="card">
+      <div class="card-header">
+        <h2>Vídeos Cadastrados</h2>
+        <button type="button" id="refreshBtn">Atualizar Lista</button>
+      </div>
+      <div id="videoListContainer">
+        <p id="loadingMsg">Carregando vídeos...</p>
+        <ul id="videoList" class="video-list"></ul>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
