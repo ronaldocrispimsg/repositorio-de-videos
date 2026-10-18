@@ -14,12 +14,13 @@ O sistema permite que usuários façam upload de vídeos e os assistam posterior
 
 ## Objetivos
 
-1. Implementar um sistema distribuído realista
-2. Utilizar as tecnologias **K3s, KEDA, RabbitMQ, NGINX e FastAPI**
-3. Permitir o upload de vídeos pelos usuários
-4. Permitir o consumo dos vídeos via **HLS**
-5. Aplicar comunicação assíncrona baseada em eventos
+1. Implementar um sistema distribuído realista e desacoplado
+2. Utilizar as tecnologias **Docker, RabbitMQ, NGINX, Node.js (Express) e FFMPEG**
+3. Permitir o upload de vídeos pelos usuários via interface web
+4. Permitir o consumo dos vídeos via **HLS** com player integrado
+5. Aplicar comunicação assíncrona baseada em eventos (AMQP)
 6. Demonstrar escalabilidade horizontal orientada a eventos no processamento de vídeos
+7. Garantir controle local e permissões diretas sobre os arquivos brutos e processados
 
 ---
 
@@ -38,69 +39,69 @@ O sistema é composto por módulos modulares, cada um encapsulado em seu própri
 
 ---
 
-### Backend (FastAPI)
+### Backend (Node.js + Express + AMQP)
 
 * Responsável pelas **APIs RESTful** (porta 8000)
-* Implementa as **regras de negócio**
-* Cria e publica eventos no **RabbitMQ**
-* Gerencia metadados e status dos vídeos
-* Disponibiliza download do arquivo bruto original
+* Implementa as **regras de negócio** e persistência de estado (`videos_state.json`)
+* Publica eventos na fila `video.uploaded` do **RabbitMQ**
+* Escuta os eventos `video.processing` e `video.ready` para manter o status atualizado
+* Disponibiliza download do arquivo bruto original (`/videos/:videoId/file`)
 
 ---
 
 ### Frontend (HTML, CSS e JavaScript Puro)
 
-* Interface leve e limpa, sem frameworks adicionais
+* Interface leve, responsiva e moderna, sem frameworks adicionais
 * Permite:
-  * Upload de vídeos
-  * Monitoramento de status em tempo real
-  * Reprodução direta via player com suporte a HLS (`hls.js`)
-* Comunicação via API REST com o backend
+  * Upload de vídeos com feedback em tempo real
+  * Monitoramento dinâmico de status dos vídeos
+  * Reprodução direta via player integrado com suporte a HLS (`hls.js`)
+* Comunicação via API REST com o backend (via Gateway em `/api` ou direto na porta 8000)
 
 ---
 
 ### RabbitMQ
 
-* Broker de mensagens (AMQP na porta 5672 e painel na porta 15672)
-* Utiliza imagem oficial pronta com plugin de gerenciamento
+* Broker de mensagens (AMQP na porta 5672 e painel de gerenciamento na porta 15672)
+* Utiliza imagem oficial com plugin de gerenciamento
 * Responsável pela **comunicação assíncrona orientada a eventos**
 * Desacopla o recebimento, a fila de processamento e a entrega
 
 ---
 
-### Process (FFMPEG Worker)
+### Process (Node.js Worker + FFMPEG)
 
-* Serviço worker responsável pelo **processamento dos vídeos**
-* Consome a fila do RabbitMQ e executa o **FFMPEG** para converter arquivos brutos (`mp4`, `mov`, `mkv`, etc.) em:
-  * Playlists `m3u8`
+* Serviço worker responsável pelo **processamento e transcode dos vídeos**
+* Consome eventos da fila `video.uploaded` do RabbitMQ
+* Notifica o início do processamento via fila `video.processing`
+* Orquestra o **FFMPEG** nativo para converter arquivos brutos em:
+  * Playlists `playlist.m3u8`
   * Segmentos HLS (`.ts`)
-* Envia os fragmentos processados para o serviço `repository` e notifica o término
+* Envia os fragmentos gerados via HTTP multipart para o serviço `repository`
+* Publica o evento `video.ready` com a URL do stream gerado
 
 ---
 
-### Repository (Streaming & Storage)
+### Repository (Node.js + Express)
 
-* Serviço FastAPI responsável por receber e armazenar os segmentos HLS na pasta compartilhada `processed_videos`
-* Serve diretamente as playlists e fragmentos via HTTP (porta 8001) para consumo do player
+* Serviço de armazenamento e entrega de streaming HLS na pasta `repository/processed_videos` (porta 8001)
+* Endpoints para receber os fragmentos (`POST /videos/:videoId/segments`) e finalizar o pacote (`POST /videos/:videoId/complete`)
+* Serve diretamente as playlists e fragmentos via HTTP (`GET /streams/*`) para o player
 * Habilita CORS para transmissões sem bloqueio no navegador
 
 ---
 
-### K3s & KEDA (Orquestração e Escalabilidade)
+### Permissões e Armazenamento Local
 
-* **K3s**: Orquestrador leve de containers para o cluster distribuído
-* **KEDA**: Responsável pelo autoscaling orientado a eventos (HPA)
-* Monitora a fila `video.uploaded` no RabbitMQ e ajusta dinamicamente a quantidade de réplicas do `process`:
-  * Escala a 0 quando não há vídeos a processar (economia de recursos)
-  * Sobe réplicas sob demanda para processar múltiplos vídeos em paralelo
-* Persistência de arquivos através de volumes compartilhados (`storage.yaml`)
+* Todos os diretórios de armazenamento (`backend/videos_raw`, `process/export`, `repository/processed_videos`) utilizam montagens diretas do host (*bind mounts*).
+* Os containers rodam com `user: "1000:1000"`, garantindo que todos os arquivos criados pertençam ao usuário local no host, sem problemas de permissão ou necessidade de `sudo` para gerenciá-los ou excluí-los.
 
 ---
 
 ## Fluxo de Funcionamento
 
 1. O usuário seleciona e envia um vídeo pelo frontend.
-2. O backend salva o arquivo bruto temporariamente e emite o evento `video.uploaded` no RabbitMQ.
+2. O backend salva o arquivo bruto em `backend/videos_raw` e emite o evento `video.uploaded` no RabbitMQ.
 3. O worker **Process**:
    * Consome o evento `video.uploaded`
    * Emite `video.processing` para atualizar o status no sistema
@@ -108,7 +109,7 @@ O sistema é composto por módulos modulares, cada um encapsulado em seu própri
 4. Concluída a conversão, o **Process**:
    * Envia os fragmentos e a playlist para a pasta `processed_videos` do **Repository**
    * Emite o evento `video.ready` com a URL do stream gerado
-5. O backend recebe `video.ready` e marca o vídeo como pronto.
+5. O backend recebe `video.ready` e marca o vídeo como pronto no estado persistido.
 6. O frontend atualiza a lista e o usuário assiste ao vídeo via **HLS** no player.
 
 ---
@@ -126,12 +127,12 @@ O sistema é composto por módulos modulares, cada um encapsulado em seu própri
 ## Estrutura do Projeto
 
 ```text
-/backend      # API FastAPI e regras de negócio
-/frontend     # Interface em HTML, CSS e JS puro
-/process      # Worker de conversão FFMPEG
+/backend      # API REST em Node.js (Express), uploads e integração RabbitMQ
+/frontend     # Interface web em HTML5, CSS3 e JavaScript puro
+/process      # Worker assíncrono em Node.js e conversão FFMPEG
 /rabbitMQ     # Broker RabbitMQ com dashboard
-/repository   # Servidor de streaming e armazenamento (processed_videos)
-/nginx        # Gateway e proxy reverso
+/repository   # Servidor de streaming HLS em Node.js (Express) e processed_videos
+/nginx        # Gateway NGINX e proxy reverso unificado
 /infra        # Manifestos K3s (Deployment, KEDA ScaledObject, Storage)
 ```
 
@@ -152,7 +153,7 @@ Cada módulo possui um arquivo `.env.example` pré-configurado. Para utilizá-lo
 
 1. Clone o repositório
 2. Acesse a pasta do projeto
-3. Execute:
+3. Inicie os containers:
 
 ```bash
 docker compose up --build
@@ -160,6 +161,7 @@ docker compose up --build
 
 4. Acessos locais disponíveis:
    * **Aplicação Web (Frontend)**: `http://localhost` (ou `http://localhost:3000`)
-   * **API Backend**: `http://localhost:8000/docs`
-   * **Servidor de Streams (Repository)**: `http://localhost:8001/docs`
-   * **Painel RabbitMQ**: `http://localhost:15672` (usuário: `videobox` / senha: `123456`)
+   * **API Backend**: `http://localhost/api/videos` (ou direto em `http://localhost:8000/videos`)
+   * **Healthcheck do Backend**: `http://localhost:8000/health`
+   * **Servidor de Streams (Repository)**: `http://localhost:8001/health`
+   * **Painel RabbitMQ**: `http://localhost:15672` (ou via Gateway em `http://localhost/message/`, usuário: `videobox` / senha: `123456`)

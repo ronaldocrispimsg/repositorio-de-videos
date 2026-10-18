@@ -15,11 +15,12 @@ services:
   backend:
     build: ./backend
     container_name: videobox-backend
+    user: "1000:1000"
     env_file: ./backend/.env
     ports:
       - "8000:8000"
     volumes:
-      - backend_videos:/videos_raw
+      - ./backend/videos_raw:/videos_raw
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -36,9 +37,10 @@ services:
   process:
     build: ./process
     container_name: videobox-process
+    user: "1000:1000"
     env_file: ./process/.env
     volumes:
-      - process_export:/srv/videobox/export
+      - ./process/export:/srv/videobox/export
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -46,11 +48,12 @@ services:
   repository:
     build: ./repository
     container_name: videobox-repository
+    user: "1000:1000"
     env_file: ./repository/.env
     ports:
       - "8001:8001"
     volumes:
-      - processed_videos:/processed_videos
+      - ./repository/processed_videos:/processed_videos
     networks:
       default:
         aliases:
@@ -68,8 +71,3 @@ services:
       - frontend
       - backend
       - rabbitmq
-
-volumes:
-  backend_videos:
-  process_export:
-  processed_videos:

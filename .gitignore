@@ -14,12 +14,19 @@ venv/
 env/
 ENV/
 
-# Armazenamento e Processamento de Vídeos (Local)
+# Armazenamento e Processamento de Vídeos (Pastas locais dos containers)
 videos_raw/
+backend/videos_raw/*
+!backend/videos_raw/.gitkeep
+export/
+process/export/*
+!process/export/.gitkeep
+processed_videos/
+repository/processed_videos/*
+!repository/processed_videos/.gitkeep
 streams_ready/
 videos_state.json
 videos_state.json.tmp
-export/
 hls/
 
 # Arquivos de mídia (evita commit acidental de arquivos pesados)
