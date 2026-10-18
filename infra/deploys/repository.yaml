@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videobox-repository
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: videobox-repository
+  template:
+    metadata:
+      labels:
+        app: videobox-repository
+    spec:
+      containers:
+        - name: repository
+          image: videobox-repository:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: STREAM_PATH
+              value: /processed_videos
+            - name: STREAM_BASE_URL
+              value: http://repository.default.svc.cluster.local:8001/streams
+          ports:
+            - containerPort: 8001
+              name: http
+          volumeMounts:
+            # Monta a pasta compartilhada 'processed_videos' no container do repository
+            - name: shared-storage
+              mountPath: /processed_videos
+              subPath: processed_videos
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: videobox-export-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: repository
+  namespace: default
+spec:
+  selector:
+    app: videobox-repository
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+      name: http
